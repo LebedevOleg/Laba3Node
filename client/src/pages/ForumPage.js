@@ -124,8 +124,4 @@ export const ForumPage = () => {
   );
 };
 
-/* {posts.map(post =>{
-  {BlockMessItem(post.)}
-})} 
-post.login,post.text, post.date*/
 export default ForumPage;
