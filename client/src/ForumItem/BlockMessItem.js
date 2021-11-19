@@ -71,9 +71,7 @@ const BlockMessItem = (post) => {
       <div className={post.new ? stl.new : ""}>
         <div className="col s12 m7">
           <div className="card horizontal">
-            <div className="card-image">
-              <img src="https://www.meme-arsenal.com/memes/77befb92cd6923bfc44a131ddf4d44e6.jpg" />
-            </div>
+            <div className="card-image"></div>
             <div className="card-stacked">
               <p>
                 Отправил:{" "}

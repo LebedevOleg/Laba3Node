@@ -1,5 +1,4 @@
 import axios from "axios";
-import { render } from "react-dom";
 import React, {
   useState,
   useEffect,

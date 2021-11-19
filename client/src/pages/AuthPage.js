@@ -13,7 +13,6 @@ export const AuthPage = () => {
   const changeHandler = (event) => {
     setForm({ ...form, [event.target.name]: event.target.value });
   };
-
   const authHandler = async () => {
     const message = "";
     try {

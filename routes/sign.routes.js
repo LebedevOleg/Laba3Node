@@ -68,17 +68,14 @@ router.post("/login", async (req, res) => {
         .status(400)
         .json({ message: "Пользователя с таким Логином не сущесвует!" });
     }
-
     if (password != user.rows[0].password) {
       return res.status(400).json({ message: "Пароль не верный!" });
     }
-
     const token = jwt.sign(
       { userId: user.rows[0].id },
       config.get("jwtSecret"),
       { expiresIn: "365d" }
     );
-
     res.json({
       token,
       userId: user.rows[0].id,
@@ -87,7 +84,7 @@ router.post("/login", async (req, res) => {
       IsBlock: user.rows[0].is_block,
     });
   } catch (e) {
-    return res.status(400).json({ message: "все пошло по **зде" });
+    return res.status(400).json({ message: "Ошибка" });
   }
 });
 
