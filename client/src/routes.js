@@ -3,6 +3,7 @@ import { Switch, Route, Redirect } from "react-router-dom";
 import { AuthPage } from "./pages/AuthPage";
 import { ForumPage } from "./pages/ForumPage";
 import { RegisterPage } from "./pages/RegisterPage";
+import { Import } from "./pages/ImportPage";
 
 export const useRoutes = (isAuth) => {
   if (isAuth) {
@@ -10,6 +11,9 @@ export const useRoutes = (isAuth) => {
       <Switch>
         <Route path="/forum/" exact>
           <ForumPage />
+        </Route>
+        <Route path="/import/" exact>
+          <Import />
         </Route>
         <Redirect to="/forum/" />
       </Switch>

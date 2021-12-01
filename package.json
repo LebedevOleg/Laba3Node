@@ -16,12 +16,20 @@
     "author": "Lebedev Oleg <lebedevoleg72@gmail.com>",
     "license": "ISC",
     "dependencies": {
+        "@syncfusion/ej2-react-calendars": "^19.3.55",
         "config": "^3.3.6",
         "express": "^4.17.1",
         "express-validator": "^6.13.0",
+        "json2csv": "^5.0.6",
         "jsonwebtoken": "^8.5.1",
         "mongoose": "^6.0.12",
-        "pg": "^8.4.1"
+        "nouislider": "^15.5.0",
+        "pg": "^8.4.1",
+        "react-csv": "^2.0.3",
+        "react-datepicker": "^4.4.0",
+        "react-dates": "^21.8.0",
+        "react-dropdown": "^1.9.2",
+        "react-select": "^5.2.1"
     },
     "devDependencies": {
         "concurrently": "^6.3.0",

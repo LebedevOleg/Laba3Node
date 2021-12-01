@@ -1,5 +1,5 @@
 @import "~materialize-css/dist/css/materialize.min.css";
-
+@import url("https://cdn.syncfusion.com/ej2/material.css");
 html,
 body {
   height: 90%;
