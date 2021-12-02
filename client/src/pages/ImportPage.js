@@ -11,6 +11,7 @@ import { AuthContext } from "../context/authContext";
 import { DatePickerComponent } from "@syncfusion/ej2-react-calendars";
 import Dropdown from "react-dropdown";
 import "react-dropdown/style.css";
+const Buffer = require("buffer").Buffer;
 
 const { Parser, parse } = require("json2csv");
 
@@ -45,7 +46,6 @@ export const Import = () => {
 
   function download(filename, text, type, charset = "utf-8") {
     var element = document.createElement("a");
-
     element.setAttribute(
       "href",
       `data:text/${type};charset=${charset},` + encodeURI(text)
@@ -60,16 +60,18 @@ export const Import = () => {
 
     document.body.removeChild(element);
   }
-
+  // *!! здесь функция отправки
   const ImportFileDate = async () => {
     var writeFile = [];
     var login = "";
+    dateEnd.setDate(dateEnd.getDate() + 1);
     await axios
       .post("/api/forum/importDataDate", {
-        StartDate: dateStart,
-        EndDate: dateEnd,
+        StartDate: dateStart.toISOString().split("T")[0],
+        EndDate: dateEnd.toISOString().split("T")[0],
       })
       .then(async (res) => {
+        console.log(res.data.rows);
         res.data.rows.map((row) => {
           if (row.login == null) {
             login = "[DELETED]";
@@ -79,7 +81,7 @@ export const Import = () => {
           writeFile.push({
             id: row.id,
             login: login,
-            text: row.text,
+            text: row.text.replaceAll("\n", ""),
             date: row.date,
           });
         });
@@ -103,15 +105,19 @@ export const Import = () => {
             break;
           case "xml":
             text =
-              '<?xml version="1.0" encoding="windows-1251"?>' +
+              '<?xml version="1.0" encoding="windows-1251"?> \n <forumPosts>' +
               writeFile
                 .map(
                   ({ id, login, text, date }) =>
-                    `<post category = "${id}">\n <author> ${login}</author> \n <content> ${text}</content> \n <date> ${date} </date>\n </post>`,
+                    `<post category = "${id}">\n <author> ${login}</author> \n <content> ${text.replaceAll(
+                      "<",
+                      ""
+                    )}</content> \n <date> ${date} </date>\n </post>`,
                   " "
                 )
-                .join("\n");
-            download(FileName, text, "xml");
+                .join("\n") +
+              "</forumPosts>";
+            download(FileName, text, "xml", "utf16le");
             break;
           // !! не меняется кодировка русские символы не читаемые Время 1:25 ДАЙТЕ МНЕ УМЕРЕТЬ
           case "csv":
@@ -122,7 +128,14 @@ export const Import = () => {
               header: true,
             };
             const csvFile = parse(writeFile, opts);
-            download(FileName, csvFile, "csv", "windows-1251");
+            download(
+              FileName,
+              writeFile
+                .map(({ login, text, date }) => `${login};${text};${date}`)
+                .join("\n"),
+              "csv",
+              "utf16le"
+            );
             break;
         }
       });
