@@ -11,6 +11,8 @@ import { AuthContext } from "../context/authContext";
 import { DatePickerComponent } from "@syncfusion/ej2-react-calendars";
 import Dropdown from "react-dropdown";
 import "react-dropdown/style.css";
+
+
 const Buffer = require("buffer").Buffer;
 
 const { Parser, parse } = require("json2csv");
@@ -23,6 +25,7 @@ export const Import = () => {
   const [formatCount, setFormatCount] = useState("");
   const history = useHistory();
   const auth = useContext(AuthContext);
+  const [upDown, setUpDown] = useState(false)
   const LogoutHandler = (event) => {
     event.preventDefault();
     auth.logout();
@@ -49,8 +52,7 @@ export const Import = () => {
     element.setAttribute(
       "href",
       `data:text/${type};charset=${charset},` + encodeURI(text)
-    );
-    console.log(element);
+    );    
     element.setAttribute("download", filename);
 
     element.style.display = "none";
@@ -64,14 +66,14 @@ export const Import = () => {
   const ImportFileDate = async () => {
     var writeFile = [];
     var login = "";
-    dateEnd.setDate(dateEnd.getDate() + 1);
+    dateEnd.setDate(dateEnd.getDate() + 2);    
     await axios
       .post("/api/forum/importDataDate", {
         StartDate: dateStart.toISOString().split("T")[0],
         EndDate: dateEnd.toISOString().split("T")[0],
       })
       .then(async (res) => {
-        console.log(res.data.rows);
+        console.log(res.data.r);
         res.data.rows.map((row) => {
           if (row.login == null) {
             login = "[DELETED]";
@@ -85,9 +87,7 @@ export const Import = () => {
             date: row.date,
           });
         });
-
         var FileName = Date.now().toString() + "." + formatDate;
-
         switch (formatDate) {
           // !! УРА ОНО РАБОТАЕТ БЛЯТЬ!!!!!!! день на это дерьмо ушло!! !!!!!!!!!!!!!!!!!!!!!!
           case "json":
@@ -105,7 +105,7 @@ export const Import = () => {
             break;
           case "xml":
             text =
-              '<?xml version="1.0" encoding="windows-1251"?> \n <forumPosts>' +
+              '<?xml version="1.0" encoding="utf-8"?> \n <forumPosts>' +
               writeFile
                 .map(
                   ({ id, login, text, date }) =>
@@ -117,7 +117,7 @@ export const Import = () => {
                 )
                 .join("\n") +
               "</forumPosts>";
-            download(FileName, text, "xml", "utf16le");
+            download(FileName, text, "xml");
             break;
           // !! не меняется кодировка русские символы не читаемые Время 1:25 ДАЙТЕ МНЕ УМЕРЕТЬ
           case "csv":
@@ -138,11 +138,12 @@ export const Import = () => {
             );
             break;
         }
+        dateEnd.setDate(dateEnd.getDate())
       });
   };
 
-  const ImportFileCount = async (check) => {
-    if (check == 1) {
+  const ImportFileCount = async () => {
+    if (upDown == false) {
       await axios.post("/api/forum/importDataDate", {
         Count: value,
         side: "up",
@@ -155,6 +156,7 @@ export const Import = () => {
         //Format: formatCount,
       });
     }
+    
   };
 
   const handleChangeFormat = (event) => {
@@ -183,6 +185,10 @@ export const Import = () => {
           break;
       }
     }
+  };
+
+  const changeBlockHandler = async (event) => {
+    setUpDown(event.target.checked)
   };
 
   return (
@@ -320,11 +326,22 @@ export const Import = () => {
                   </p>
                 </form>
               </p>
+              <div className="switch">
+            <label>
+              С верху
+              <input
+                type="checkbox"                                
+                onChange={changeBlockHandler}
+              />
+              <span className="lever"></span>
+              С низу
+            </label>
+          </div>
             </div>
             <div className="card-action">
               <a style={{ cursor: "pointer" }} onClick={ImportFileCount}>
                 Импортировать
-              </a>
+              </a>              
             </div>
           </div>
         </div>

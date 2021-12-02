@@ -164,6 +164,7 @@ router.get("/getLastPost", auth, async (req, res) => {
 router.post("/importDataDate", async (req, res) => {
   try {
     const { StartDate, EndDate } = req.body;
+    console.log(StartDate, EndDate)
     const messagesDB = await db.query(
       "SELECT post.id, users.login, post.text, post.date FROM post full outer join users on post.user_id = users.id where post.text is not null and post.date > $1 and post.date < $2 ORDER BY date desc",
       [StartDate, EndDate]
@@ -173,4 +174,19 @@ router.post("/importDataDate", async (req, res) => {
     console.log(e.message);
   }
 });
+
+router.post("/importDataCount", async (req, res) => {
+  try {
+    const { StartDate, EndDate } = req.body;
+    console.log(StartDate, EndDate)
+    const messagesDB = await db.query(
+      "SELECT post.id, users.login, post.text, post.date FROM post full outer join users on post.user_id = users.id where post.text is not null and post.date > $1 and post.date < $2 ORDER BY date desc",
+      [StartDate, EndDate]
+    );
+    res.json(messagesDB);
+  } catch (e) {
+    console.log(e.message);
+  }
+});
+
 module.exports = router;
