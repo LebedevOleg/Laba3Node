@@ -20,7 +20,9 @@
         "config": "^3.3.6",
         "express": "^4.17.1",
         "express-validator": "^6.13.0",
+        "json-as-xlsx": "^2.3.0",
         "json2csv": "^5.0.6",
+        "json2xls": "^0.1.2",
         "jsonwebtoken": "^8.5.1",
         "mongoose": "^6.0.12",
         "nouislider": "^15.5.0",
@@ -28,8 +30,10 @@
         "react-csv": "^2.0.3",
         "react-datepicker": "^4.4.0",
         "react-dates": "^21.8.0",
+        "react-docx": "^1.0.1",
         "react-dropdown": "^1.9.2",
-        "react-select": "^5.2.1"
+        "react-select": "^5.2.1",
+        "xlsx": "^0.17.4"
     },
     "devDependencies": {
         "concurrently": "^6.3.0",

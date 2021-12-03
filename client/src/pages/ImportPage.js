@@ -6,12 +6,15 @@ import React, {
   useContext,
   Component,
 } from "react";
+import fs, { writeFileSync } from "fs";
 import { useHistory } from "react-router";
 import { AuthContext } from "../context/authContext";
 import { DatePickerComponent } from "@syncfusion/ej2-react-calendars";
 import Dropdown from "react-dropdown";
 import "react-dropdown/style.css";
+let xlsx = require("json-as-xlsx");
 
+var json2xls = require("json2xls");
 
 const Buffer = require("buffer").Buffer;
 
@@ -25,7 +28,7 @@ export const Import = () => {
   const [formatCount, setFormatCount] = useState("");
   const history = useHistory();
   const auth = useContext(AuthContext);
-  const [upDown, setUpDown] = useState(false)
+  const [upDown, setUpDown] = useState(false);
   const LogoutHandler = (event) => {
     event.preventDefault();
     auth.logout();
@@ -52,7 +55,23 @@ export const Import = () => {
     element.setAttribute(
       "href",
       `data:text/${type};charset=${charset},` + encodeURI(text)
-    );    
+    );
+    element.setAttribute("download", filename);
+
+    element.style.display = "none";
+    document.body.appendChild(element);
+
+    element.click();
+
+    document.body.removeChild(element);
+  }
+
+  function downloadDOP(file, filename) {
+    const blob = new Blob([file]);
+    const fileDownloadUrl = URL.createObjectURL(blob);
+
+    var element = document.createElement("a");
+    element.setAttribute("href", fileDownloadUrl);
     element.setAttribute("download", filename);
 
     element.style.display = "none";
@@ -66,14 +85,13 @@ export const Import = () => {
   const ImportFileDate = async () => {
     var writeFile = [];
     var login = "";
-    dateEnd.setDate(dateEnd.getDate() + 2);    
+    dateEnd.setDate(dateEnd.getDate() + 2);
     await axios
       .post("/api/forum/importDataDate", {
         StartDate: dateStart.toISOString().split("T")[0],
         EndDate: dateEnd.toISOString().split("T")[0],
       })
       .then(async (res) => {
-        console.log(res.data.r);
         res.data.rows.map((row) => {
           if (row.login == null) {
             login = "[DELETED]";
@@ -134,29 +152,169 @@ export const Import = () => {
                 .map(({ login, text, date }) => `${login};${text};${date}`)
                 .join("\n"),
               "csv",
-              "utf16le"
+              "utf8"
             );
             break;
+          case "xls":
+            var data = {
+              sheet: "messages",
+              columns: [
+                { label: "login", value: "login" },
+                { label: "text", value: "text" },
+                { label: "date", value: "date" },
+              ],
+              content: [],
+            };
+
+            writeFile.map(({ id, login, text, date }) => {
+              data.content.push({
+                login: login,
+                text: text,
+                date: date,
+              });
+            });
+            var settings = { fileName: FileName, extraLength: 3 };
+            xlsx(data, settings);
+            //downloadDOP(text, FileName);
+            break;
         }
-        dateEnd.setDate(dateEnd.getDate())
+        dateEnd.setDate(dateEnd.getDate());
       });
   };
 
   const ImportFileCount = async () => {
+    console.log(formatCount);
+    var writeFile = [];
+    var login = "";
     if (upDown == false) {
-      await axios.post("/api/forum/importDataDate", {
-        Count: value,
-        side: "up",
-        //Format: formatCount,
-      });
+      await axios
+        .post("/api/forum/importDataCount", {
+          Count: value,
+          side: "desc",
+        })
+        .then(async (res) => {
+          res.data.rows.map((row) => {
+            if (row.login == null) {
+              login = "[DELETED]";
+            } else {
+              login = row.login;
+            }
+            writeFile.push({
+              id: row.id,
+              login: login,
+              text: row.text.replaceAll("\n", ""),
+              date: row.date,
+            });
+          });
+          var FileName = Date.now().toString() + "." + formatCount;
+          switch (formatCount) {
+            // !! УРА ОНО РАБОТАЕТ БЛЯТЬ!!!!!!! день на это дерьмо ушло!! !!!!!!!!!!!!!!!!!!!!!!
+            case "json":
+              var text =
+                '{"messages":[' +
+                writeFile
+                  .map(
+                    ({ login, text, date }) =>
+                      `{\"Пользователь\" : \"${login}\", \"текст\" :\"${text}\", \"дата\" :\"${date}\"}`,
+                    ""
+                  )
+                  .join(",") +
+                "]}";
+              download(FileName, text, "json");
+              break;
+            case "xml":
+              text =
+                '<?xml version="1.0" encoding="utf-8"?> \n <forumPosts>' +
+                writeFile
+                  .map(
+                    ({ id, login, text, date }) =>
+                      `<post category = "${id}">\n <author> ${login}</author> \n <content> ${text.replaceAll(
+                        "<",
+                        ""
+                      )}</content> \n <date> ${date} </date>\n </post>`,
+                    " "
+                  )
+                  .join("\n") +
+                "</forumPosts>";
+              download(FileName, text, "xml");
+              break;
+            // !! не меняется кодировка русские символы не читаемые Время 1:25 ДАЙТЕ МНЕ УМЕРЕТЬ
+            case "csv":
+              var fields = ["login", "text", "date"];
+              var opts = {
+                fields,
+                delimiter: ";",
+                header: true,
+              };
+              const csvFile = parse(writeFile, opts);
+              download(FileName, csvFile, "csv", "utf8");
+              break;
+          }
+        });
     } else {
-      await axios.post("/api/forum/importDataDate", {
-        Count: value,
-        side: "down",
-        //Format: formatCount,
-      });
+      await axios
+        .post("/api/forum/importDataCount", {
+          Count: value,
+          side: "asc",
+        })
+        .then(async (res) => {
+          res.data.rows.map((row) => {
+            if (row.login == null) {
+              login = "[DELETED]";
+            } else {
+              login = row.login;
+            }
+            writeFile.push({
+              id: row.id,
+              login: login,
+              text: row.text.replaceAll("\n", ""),
+              date: row.date,
+            });
+          });
+          var FileName = Date.now().toString() + "." + formatCount;
+          switch (formatCount) {
+            case "json":
+              var text =
+                '{"messages":[' +
+                writeFile
+                  .map(
+                    ({ login, text, date }) =>
+                      `{\"Пользователь\" : \"${login}\", \"текст\" :\"${text}\", \"дата\" :\"${date}\"}`,
+                    ""
+                  )
+                  .join(",") +
+                "]}";
+              download(FileName, text, "json");
+              break;
+            case "xml":
+              text =
+                '<?xml version="1.0" encoding="utf-8"?> \n <forumPosts>' +
+                writeFile
+                  .map(
+                    ({ id, login, text, date }) =>
+                      `<post category = "${id}">\n <author> ${login}</author> \n <content> ${text.replaceAll(
+                        "<",
+                        ""
+                      )}</content> \n <date> ${date} </date>\n </post>`,
+                    " "
+                  )
+                  .join("\n") +
+                "</forumPosts>";
+              download(FileName, text, "xml");
+              break;
+            case "csv":
+              var fields = ["login", "text", "date"];
+              var opts = {
+                fields,
+                delimiter: ";",
+                header: true,
+              };
+              const csvFile = parse(writeFile, opts);
+              download(FileName, csvFile, "csv", "utf8");
+              break;
+          }
+        });
     }
-    
   };
 
   const handleChangeFormat = (event) => {
@@ -171,6 +329,9 @@ export const Import = () => {
         case "3":
           setFormatDate("xml");
           break;
+        case "4":
+          setFormatDate("xls");
+          break;
       }
     } else {
       switch (event.target.id) {
@@ -183,12 +344,15 @@ export const Import = () => {
         case "3":
           setFormatCount("xml");
           break;
+        case "4":
+          setFormatDate("xls");
+          break;
       }
     }
   };
 
   const changeBlockHandler = async (event) => {
-    setUpDown(event.target.checked)
+    setUpDown(event.target.checked);
   };
 
   return (
@@ -268,6 +432,18 @@ export const Import = () => {
                         <span>XML</span>
                       </label>
                     </p>
+                    <p>
+                      <label>
+                        <input
+                          id="4"
+                          class="with-gap"
+                          name="group1"
+                          type="radio"
+                          onChange={handleChangeFormat}
+                        />
+                        <span>DOCX</span>
+                      </label>
+                    </p>
                   </form>
                 </p>
               </div>
@@ -324,24 +500,31 @@ export const Import = () => {
                       <span>XML</span>
                     </label>
                   </p>
+                  <p>
+                    <label>
+                      <input
+                        id="4"
+                        name="group2"
+                        type="radio"
+                        onChange={handleChangeFormat}
+                      />
+                      <span>DOCX</span>
+                    </label>
+                  </p>
                 </form>
               </p>
               <div className="switch">
-            <label>
-              С верху
-              <input
-                type="checkbox"                                
-                onChange={changeBlockHandler}
-              />
-              <span className="lever"></span>
-              С низу
-            </label>
-          </div>
+                <label>
+                  С верху
+                  <input type="checkbox" onChange={changeBlockHandler} />
+                  <span className="lever"></span>С низу
+                </label>
+              </div>
             </div>
             <div className="card-action">
               <a style={{ cursor: "pointer" }} onClick={ImportFileCount}>
                 Импортировать
-              </a>              
+              </a>
             </div>
           </div>
         </div>
