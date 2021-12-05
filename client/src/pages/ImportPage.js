@@ -11,14 +11,28 @@ import { useHistory } from "react-router";
 import { AuthContext } from "../context/authContext";
 import { DatePickerComponent } from "@syncfusion/ej2-react-calendars";
 import Dropdown from "react-dropdown";
+import Select from "react-select";
 import "react-dropdown/style.css";
-let xlsx = require("json-as-xlsx");
-
-var json2xls = require("json2xls");
-
-const Buffer = require("buffer").Buffer;
-
+const XLSX = require("xlsx");
 const { Parser, parse } = require("json2csv");
+
+const colourStyles = {
+  control: (styles) => ({ ...styles, backgroundColor: "white" }),
+  option: (styles, { data, isDisabled, isFocused, isSelected }) => {
+    return {
+      ...styles,
+      backgroundColor: isDisabled ? "red" : "white",
+      color: "black",
+      isSelected: "grey",
+      cursor: isDisabled ? "not-allowed" : "default",
+    };
+  },
+};
+
+const optionsSwitch = [
+  { value: "like", label: "Колличество лайков" },
+  { value: "email", label: "email отправителя" },
+];
 
 export const Import = () => {
   const [dateStart, setDateStart] = useState(new Date());
@@ -29,6 +43,11 @@ export const Import = () => {
   const history = useHistory();
   const auth = useContext(AuthContext);
   const [upDown, setUpDown] = useState(false);
+
+  var listExport = {
+    selectedItems: null,
+  };
+
   const LogoutHandler = (event) => {
     event.preventDefault();
     auth.logout();
@@ -66,25 +85,12 @@ export const Import = () => {
     document.body.removeChild(element);
   }
 
-  function downloadDOP(file, filename) {
-    const blob = new Blob([file]);
-    const fileDownloadUrl = URL.createObjectURL(blob);
-
-    var element = document.createElement("a");
-    element.setAttribute("href", fileDownloadUrl);
-    element.setAttribute("download", filename);
-
-    element.style.display = "none";
-    document.body.appendChild(element);
-
-    element.click();
-
-    document.body.removeChild(element);
-  }
-  // *!! здесь функция отправки
+  // *!! здесь функция отправки по дате
   const ImportFileDate = async () => {
     var writeFile = [];
     var login = "";
+    var likes = false;
+    var email = false;
     dateEnd.setDate(dateEnd.getDate() + 2);
     await axios
       .post("/api/forum/importDataDate", {
@@ -98,84 +104,141 @@ export const Import = () => {
           } else {
             login = row.login;
           }
-          writeFile.push({
-            id: row.id,
-            login: login,
-            text: row.text.replaceAll("\n", ""),
-            date: row.date,
-          });
+          try {
+            if (
+              listExport[0].value === "like" ||
+              listExport[1].value === "like"
+            ) {
+              likes = true;
+            }
+          } catch (e) {}
+          try {
+            if (
+              listExport[0].value == "email" ||
+              listExport[1].value == "email"
+            ) {
+              email = true;
+            }
+          } catch (e) {}
+          if (email && likes) {
+            writeFile.push({
+              id: row.id,
+              login: login,
+              text: row.text.replaceAll("\n", ""),
+              date: row.date,
+              email: row.email,
+              likes: row.count,
+            });
+          } else if (email && !likes) {
+            writeFile.push({
+              id: row.id,
+              login: login,
+              text: row.text.replaceAll("\n", ""),
+              date: row.date,
+              email: row.email,
+            });
+          } else if (!email && likes) {
+            writeFile.push({
+              id: row.id,
+              login: login,
+              text: row.text.replaceAll("\n", ""),
+              date: row.date,
+              likes: row.count,
+            });
+          } else {
+            writeFile.push({
+              id: row.id,
+              login: login,
+              text: row.text.replaceAll("\n", ""),
+              date: row.date,
+            });
+          }
         });
         var FileName = Date.now().toString() + "." + formatDate;
         switch (formatDate) {
           // !! УРА ОНО РАБОТАЕТ БЛЯТЬ!!!!!!! день на это дерьмо ушло!! !!!!!!!!!!!!!!!!!!!!!!
           case "json":
-            var text =
-              '{"messages":[' +
-              writeFile
-                .map(
-                  ({ login, text, date }) =>
-                    `{\"Пользователь\" : \"${login}\", \"текст\" :\"${text}\", \"дата\" :\"${date}\"}`,
-                  ""
-                )
-                .join(",") +
-              "]}";
+            var text = JSON.stringify(writeFile);
             download(FileName, text, "json");
             break;
           case "xml":
-            text =
-              '<?xml version="1.0" encoding="utf-8"?> \n <forumPosts>' +
-              writeFile
-                .map(
-                  ({ id, login, text, date }) =>
-                    `<post category = "${id}">\n <author> ${login}</author> \n <content> ${text.replaceAll(
-                      "<",
-                      ""
-                    )}</content> \n <date> ${date} </date>\n </post>`,
-                  " "
-                )
-                .join("\n") +
-              "</forumPosts>";
+            var text = "";
+            if (email && likes) {
+              text =
+                '<?xml version="1.0" encoding="utf-8"?> \n <forumPosts>' +
+                writeFile
+                  .map(
+                    ({ id, login, text, date, email, likes }) =>
+                      `<post category = "${id}">\n <author> ${login}</author> \n <content> ${text.replaceAll(
+                        "<",
+                        ""
+                      )}</content> \n <date> ${date} </date>\n <email>${email}</email> \n <like>${likes}</like>\n </post>`,
+                    " "
+                  )
+                  .join("\n") +
+                "</forumPosts>";
+            } else if (email && !likes) {
+              text =
+                '<?xml version="1.0" encoding="utf-8"?> \n <forumPosts>' +
+                writeFile
+                  .map(
+                    ({ id, login, text, date, email, likes }) =>
+                      `<post category = "${id}">\n <author> ${login}</author> \n <content> ${text.replaceAll(
+                        "<",
+                        ""
+                      )}</content> \n <date> ${date} </date>\n <email>${email}</email>\n </post>`,
+                    " "
+                  )
+                  .join("\n") +
+                "</forumPosts>";
+            } else if (!email && likes) {
+              text =
+                '<?xml version="1.0" encoding="utf-8"?> \n <forumPosts>' +
+                writeFile
+                  .map(
+                    ({ id, login, text, date, email, likes }) =>
+                      `<post category = "${id}">\n <author> ${login}</author> \n <content> ${text.replaceAll(
+                        "<",
+                        ""
+                      )}</content> \n <date> ${date} </date> \n <like>${likes}</like>\n </post>`,
+                    " "
+                  )
+                  .join("\n") +
+                "</forumPosts>";
+            } else {
+              text =
+                '<?xml version="1.0" encoding="utf-8"?> \n <forumPosts>' +
+                writeFile
+                  .map(
+                    ({ id, login, text, date, email, likes }) =>
+                      `<post category = "${id}">\n <author> ${login}</author> \n <content> ${text.replaceAll(
+                        "<",
+                        ""
+                      )}</content> \n <date> ${date} </date>\n </post>`,
+                    " "
+                  )
+                  .join("\n") +
+                "</forumPosts>";
+            }
+
             download(FileName, text, "xml");
             break;
-          // !! не меняется кодировка русские символы не читаемые Время 1:25 ДАЙТЕ МНЕ УМЕРЕТЬ
+
           case "csv":
-            var fields = ["login", "text", "date"];
             var opts = {
-              fields,
               delimiter: ";",
               header: true,
             };
             const csvFile = parse(writeFile, opts);
-            download(
-              FileName,
-              writeFile
-                .map(({ login, text, date }) => `${login};${text};${date}`)
-                .join("\n"),
-              "csv",
-              "utf8"
-            );
+            download(FileName, csvFile, "csv", "utf8");
             break;
-          case "xls":
-            var data = {
-              sheet: "messages",
-              columns: [
-                { label: "login", value: "login" },
-                { label: "text", value: "text" },
-                { label: "date", value: "date" },
-              ],
-              content: [],
-            };
-
-            writeFile.map(({ id, login, text, date }) => {
-              data.content.push({
-                login: login,
-                text: text,
-                date: date,
-              });
-            });
-            var settings = { fileName: FileName, extraLength: 3 };
-            xlsx(data, settings);
-            //downloadDOP(text, FileName);
+          case "xlsx":
+            const workSheet = XLSX.utils.json_to_sheet(writeFile);
+            const workBook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workBook, workSheet, "students");
+            XLSX.write(workBook, { bookType: "xlsx", type: "buffer" });
+            XLSX.write(workBook, { bookType: "xlsx", type: "binary" });
+            XLSX.writeFile(workBook, FileName);
             break;
         }
         dateEnd.setDate(dateEnd.getDate());
@@ -186,6 +249,8 @@ export const Import = () => {
     console.log(formatCount);
     var writeFile = [];
     var login = "";
+    var likes = false;
+    var email = false;
     if (upDown == false) {
       await axios
         .post("/api/forum/importDataCount", {
@@ -199,55 +264,140 @@ export const Import = () => {
             } else {
               login = row.login;
             }
-            writeFile.push({
-              id: row.id,
-              login: login,
-              text: row.text.replaceAll("\n", ""),
-              date: row.date,
-            });
+            try {
+              if (
+                listExport[0].value === "like" ||
+                listExport[1].value === "like"
+              ) {
+                likes = true;
+              }
+            } catch (e) {}
+            try {
+              if (
+                listExport[0].value == "email" ||
+                listExport[1].value == "email"
+              ) {
+                email = true;
+              }
+            } catch (e) {}
+            console.log(email, likes);
+            if (email && likes) {
+              writeFile.push({
+                id: row.id,
+                login: login,
+                text: row.text.replaceAll("\n", ""),
+                date: row.date,
+                email: row.email,
+                likes: row.count,
+              });
+            } else if (email && !likes) {
+              writeFile.push({
+                id: row.id,
+                login: login,
+                text: row.text.replaceAll("\n", ""),
+                date: row.date,
+                email: row.email,
+              });
+            } else if (!email && likes) {
+              writeFile.push({
+                id: row.id,
+                login: login,
+                text: row.text.replaceAll("\n", ""),
+                date: row.date,
+                likes: row.count,
+              });
+            } else {
+              writeFile.push({
+                id: row.id,
+                login: login,
+                text: row.text.replaceAll("\n", ""),
+                date: row.date,
+              });
+            }
           });
           var FileName = Date.now().toString() + "." + formatCount;
           switch (formatCount) {
-            // !! УРА ОНО РАБОТАЕТ БЛЯТЬ!!!!!!! день на это дерьмо ушло!! !!!!!!!!!!!!!!!!!!!!!!
             case "json":
-              var text =
-                '{"messages":[' +
-                writeFile
-                  .map(
-                    ({ login, text, date }) =>
-                      `{\"Пользователь\" : \"${login}\", \"текст\" :\"${text}\", \"дата\" :\"${date}\"}`,
-                    ""
-                  )
-                  .join(",") +
-                "]}";
+              var text = JSON.stringify(writeFile);
               download(FileName, text, "json");
               break;
             case "xml":
-              text =
-                '<?xml version="1.0" encoding="utf-8"?> \n <forumPosts>' +
-                writeFile
-                  .map(
-                    ({ id, login, text, date }) =>
-                      `<post category = "${id}">\n <author> ${login}</author> \n <content> ${text.replaceAll(
-                        "<",
-                        ""
-                      )}</content> \n <date> ${date} </date>\n </post>`,
-                    " "
-                  )
-                  .join("\n") +
-                "</forumPosts>";
+              var text = "";
+              if (email && likes) {
+                text =
+                  '<?xml version="1.0" encoding="utf-8"?> \n <forumPosts>' +
+                  writeFile
+                    .map(
+                      ({ id, login, text, date, email, likes }) =>
+                        `<post category = "${id}">\n <author> ${login}</author> \n <content> ${text.replaceAll(
+                          "<",
+                          ""
+                        )}</content> \n <date> ${date} </date>\n <email>${email}</email> \n <like>${likes}</like>\n </post>`,
+                      " "
+                    )
+                    .join("\n") +
+                  "</forumPosts>";
+              } else if (email && !likes) {
+                text =
+                  '<?xml version="1.0" encoding="utf-8"?> \n <forumPosts>' +
+                  writeFile
+                    .map(
+                      ({ id, login, text, date, email, likes }) =>
+                        `<post category = "${id}">\n <author> ${login}</author> \n <content> ${text.replaceAll(
+                          "<",
+                          ""
+                        )}</content> \n <date> ${date} </date>\n <email>${email}</email>\n </post>`,
+                      " "
+                    )
+                    .join("\n") +
+                  "</forumPosts>";
+              } else if (!email && likes) {
+                text =
+                  '<?xml version="1.0" encoding="utf-8"?> \n <forumPosts>' +
+                  writeFile
+                    .map(
+                      ({ id, login, text, date, email, likes }) =>
+                        `<post category = "${id}">\n <author> ${login}</author> \n <content> ${text.replaceAll(
+                          "<",
+                          ""
+                        )}</content> \n <date> ${date} </date> \n <like>${likes}</like>\n </post>`,
+                      " "
+                    )
+                    .join("\n") +
+                  "</forumPosts>";
+              } else {
+                text =
+                  '<?xml version="1.0" encoding="utf-8"?> \n <forumPosts>' +
+                  writeFile
+                    .map(
+                      ({ id, login, text, date, email, likes }) =>
+                        `<post category = "${id}">\n <author> ${login}</author> \n <content> ${text.replaceAll(
+                          "<",
+                          ""
+                        )}</content> \n <date> ${date} </date>\n </post>`,
+                      " "
+                    )
+                    .join("\n") +
+                  "</forumPosts>";
+              }
               download(FileName, text, "xml");
               break;
             // !! не меняется кодировка русские символы не читаемые Время 1:25 ДАЙТЕ МНЕ УМЕРЕТЬ
             case "csv":
-              var fields = ["login", "text", "date"];
               var opts = {
-                fields,
                 delimiter: ";",
                 header: true,
               };
               const csvFile = parse(writeFile, opts);
               download(FileName, csvFile, "csv", "utf8");
+              break;
+            case "xlsx":
+              const workSheet = XLSX.utils.json_to_sheet(writeFile);
+              const workBook = XLSX.utils.book_new();
+              XLSX.utils.book_append_sheet(workBook, workSheet, "students");
+              XLSX.write(workBook, { bookType: "xlsx", type: "buffer" });
+              XLSX.write(workBook, { bookType: "xlsx", type: "binary" });
+              XLSX.writeFile(workBook, FileName);
               break;
           }
         });
@@ -264,53 +414,139 @@ export const Import = () => {
             } else {
               login = row.login;
             }
-            writeFile.push({
-              id: row.id,
-              login: login,
-              text: row.text.replaceAll("\n", ""),
-              date: row.date,
-            });
+            try {
+              if (
+                listExport[0].value === "like" ||
+                listExport[1].value === "like"
+              ) {
+                likes = true;
+              }
+            } catch (e) {}
+            try {
+              if (
+                listExport[0].value == "email" ||
+                listExport[1].value == "email"
+              ) {
+                email = true;
+              }
+            } catch (e) {}
+            console.log(email, likes);
+            if (email && likes) {
+              writeFile.push({
+                id: row.id,
+                login: login,
+                text: row.text.replaceAll("\n", ""),
+                date: row.date,
+                email: row.email,
+                likes: row.count,
+              });
+            } else if (email && !likes) {
+              writeFile.push({
+                id: row.id,
+                login: login,
+                text: row.text.replaceAll("\n", ""),
+                date: row.date,
+                email: row.email,
+              });
+            } else if (!email && likes) {
+              writeFile.push({
+                id: row.id,
+                login: login,
+                text: row.text.replaceAll("\n", ""),
+                date: row.date,
+                likes: row.count,
+              });
+            } else {
+              writeFile.push({
+                id: row.id,
+                login: login,
+                text: row.text.replaceAll("\n", ""),
+                date: row.date,
+              });
+            }
           });
           var FileName = Date.now().toString() + "." + formatCount;
           switch (formatCount) {
             case "json":
-              var text =
-                '{"messages":[' +
-                writeFile
-                  .map(
-                    ({ login, text, date }) =>
-                      `{\"Пользователь\" : \"${login}\", \"текст\" :\"${text}\", \"дата\" :\"${date}\"}`,
-                    ""
-                  )
-                  .join(",") +
-                "]}";
+              var text = JSON.stringify(writeFile);
               download(FileName, text, "json");
               break;
             case "xml":
-              text =
-                '<?xml version="1.0" encoding="utf-8"?> \n <forumPosts>' +
-                writeFile
-                  .map(
-                    ({ id, login, text, date }) =>
-                      `<post category = "${id}">\n <author> ${login}</author> \n <content> ${text.replaceAll(
-                        "<",
-                        ""
-                      )}</content> \n <date> ${date} </date>\n </post>`,
-                    " "
-                  )
-                  .join("\n") +
-                "</forumPosts>";
+              var text = "";
+              if (email && likes) {
+                text =
+                  '<?xml version="1.0" encoding="utf-8"?> \n <forumPosts>' +
+                  writeFile
+                    .map(
+                      ({ id, login, text, date, email, likes }) =>
+                        `<post category = "${id}">\n <author> ${login}</author> \n <content> ${text.replaceAll(
+                          "<",
+                          ""
+                        )}</content> \n <date> ${date} </date>\n <email>${email}</email> \n <like>${likes}</like>\n </post>`,
+                      " "
+                    )
+                    .join("\n") +
+                  "</forumPosts>";
+              } else if (email && !likes) {
+                text =
+                  '<?xml version="1.0" encoding="utf-8"?> \n <forumPosts>' +
+                  writeFile
+                    .map(
+                      ({ id, login, text, date, email, likes }) =>
+                        `<post category = "${id}">\n <author> ${login}</author> \n <content> ${text.replaceAll(
+                          "<",
+                          ""
+                        )}</content> \n <date> ${date} </date>\n <email>${email}</email>\n </post>`,
+                      " "
+                    )
+                    .join("\n") +
+                  "</forumPosts>";
+              } else if (!email && likes) {
+                text =
+                  '<?xml version="1.0" encoding="utf-8"?> \n <forumPosts>' +
+                  writeFile
+                    .map(
+                      ({ id, login, text, date, email, likes }) =>
+                        `<post category = "${id}">\n <author> ${login}</author> \n <content> ${text.replaceAll(
+                          "<",
+                          ""
+                        )}</content> \n <date> ${date} </date> \n <like>${likes}</like>\n </post>`,
+                      " "
+                    )
+                    .join("\n") +
+                  "</forumPosts>";
+              } else {
+                text =
+                  '<?xml version="1.0" encoding="utf-8"?> \n <forumPosts>' +
+                  writeFile
+                    .map(
+                      ({ id, login, text, date, email, likes }) =>
+                        `<post category = "${id}">\n <author> ${login}</author> \n <content> ${text.replaceAll(
+                          "<",
+                          ""
+                        )}</content> \n <date> ${date} </date>\n </post>`,
+                      " "
+                    )
+                    .join("\n") +
+                  "</forumPosts>";
+              }
               download(FileName, text, "xml");
               break;
             case "csv":
-              var fields = ["login", "text", "date"];
               var opts = {
-                fields,
                 delimiter: ";",
                 header: true,
               };
               const csvFile = parse(writeFile, opts);
               download(FileName, csvFile, "csv", "utf8");
+              break;
+            case "xlsx":
+              const workSheet = XLSX.utils.json_to_sheet(writeFile);
+              const workBook = XLSX.utils.book_new();
+              XLSX.utils.book_append_sheet(workBook, workSheet, "students");
+              XLSX.write(workBook, { bookType: "xlsx", type: "buffer" });
+              XLSX.write(workBook, { bookType: "xlsx", type: "binary" });
+              XLSX.writeFile(workBook, FileName);
               break;
           }
         });
@@ -330,7 +566,7 @@ export const Import = () => {
           setFormatDate("xml");
           break;
         case "4":
-          setFormatDate("xls");
+          setFormatDate("xlsx");
           break;
       }
     } else {
@@ -345,7 +581,7 @@ export const Import = () => {
           setFormatCount("xml");
           break;
         case "4":
-          setFormatDate("xls");
+          setFormatCount("xlsx");
           break;
       }
     }
@@ -353,6 +589,10 @@ export const Import = () => {
 
   const changeBlockHandler = async (event) => {
     setUpDown(event.target.checked);
+  };
+
+  const changeListExport = async (event) => {
+    listExport = event;
   };
 
   return (
@@ -441,7 +681,7 @@ export const Import = () => {
                           type="radio"
                           onChange={handleChangeFormat}
                         />
-                        <span>DOCX</span>
+                        <span>XLSX</span>
                       </label>
                     </p>
                   </form>
@@ -455,7 +695,6 @@ export const Import = () => {
             </div>
           </div>
         </div>
-
         <div className="col s12 m6 ">
           <div className="card blue-grey darken-1">
             <div className="card-content white-text">
@@ -508,7 +747,7 @@ export const Import = () => {
                         type="radio"
                         onChange={handleChangeFormat}
                       />
-                      <span>DOCX</span>
+                      <span>XLSX</span>
                     </label>
                   </p>
                 </form>
@@ -527,6 +766,23 @@ export const Import = () => {
               </a>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div class="col s12 m6">
+        <div class="card blue-grey darken-1">
+          <div class="card-content white-text">
+            <span class="card-title">Выбрать данные для экспорта</span>
+            <p>
+              <Select
+                options={optionsSwitch}
+                isMulti={true}
+                styles={colourStyles}
+                onChange={changeListExport}
+              />
+            </p>
+          </div>
+          <div class="card-action"></div>
         </div>
       </div>
     </>

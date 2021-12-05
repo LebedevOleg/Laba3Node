@@ -164,8 +164,9 @@ router.get("/getLastPost", auth, async (req, res) => {
 router.post("/importDataDate", async (req, res) => {
   try {
     const { StartDate, EndDate } = req.body;
+
     const messagesDB = await db.query(
-      "SELECT post.id, users.login, post.text, post.date FROM post full outer join users on post.user_id = users.id where post.text is not null and post.date > $1 and post.date < $2 ORDER BY date desc",
+      "SELECT post.id, users.login, post.text, post.date, count(likes), users.email FROM post full outer join users on post.user_id = users.id left join likes on post.id = likes.post_id where post.text is not null and post.date > $1 and post.date < $2 group by post.id,users.id ORDER BY date desc",
       [StartDate, EndDate]
     );
     res.json(messagesDB);
@@ -179,13 +180,13 @@ router.post("/importDataCount", async (req, res) => {
     const { Count, side } = req.body;
     if (side === "desc") {
       const messagesDB = await db.query(
-        "SELECT post.id, users.login, post.text, post.date FROM post full outer join users on post.user_id = users.id where post.text is not null ORDER BY date desc limit $1",
+        "SELECT post.id, users.login, post.text, post.date, users.email, count(likes) FROM post full outer join users on post.user_id = users.id	left join likes on post.id = likes.post_id where post.text is not null	group by post.id, users.id ORDER BY date desc limit $1",
         [Count]
       );
       res.json(messagesDB);
     } else {
       const messagesDB = await db.query(
-        "SELECT post.id, users.login, post.text, post.date FROM post full outer join users on post.user_id = users.id where post.text is not null ORDER BY date asc limit $1",
+        "SELECT post.id, users.login, post.text, post.date, users.email, count(likes) FROM post full outer join users on post.user_id = users.id	left join likes on post.id = likes.post_id where post.text is not null	group by post.id, users.id ORDER BY date asc limit $1",
         [Count]
       );
       res.json(messagesDB);
